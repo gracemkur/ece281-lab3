@@ -57,28 +57,80 @@ end thunderbird_fsm_tb;
 architecture test_bench of thunderbird_fsm_tb is 
 	
 	component thunderbird_fsm is 
---	  port(
-		
---	  );
+    port(
+        i_clk   : in std_logic;
+        i_reset : in std_logic;
+        i_left  : in std_logic;
+        i_right : in std_logic;
+        o_lights_l : out std_logic_vector(2 downto 0);
+        o_lights_r : out std_logic_vector(2 downto 0)
+    );
 	end component thunderbird_fsm;
 
 	-- test I/O signals
-	
+	-- Signals for connecting to DUT
+    signal clk      : std_logic := '0';
+    signal reset    : std_logic := '1';
+    signal left     : std_logic := '0';
+    signal right    : std_logic := '0';
+    signal lights_l : std_logic_vector(2 downto 0);
+    signal lights_r : std_logic_vector(2 downto 0);
+
 	-- constants
 	
 	
 begin
 	-- PORT MAPS ----------------------------------------
-	
+	DUT: thunderbird_fsm
+    port map(
+      i_clk     => clk,
+      i_reset   => reset,
+      i_left    => left,
+      i_right   => right,
+      o_lights_l => lights_l,
+      o_lights_r => lights_r
+    );
 	-----------------------------------------------------
 	
 	-- PROCESSES ----------------------------------------	
     -- Clock process ------------------------------------
-    
+    clock_proc : process
+      begin
+        while true loop
+          clk <= '0';
+          wait for 5 ns;
+          clk <= '1';
+          wait for 5 ns;
+        end loop;
+      end process;
 	-----------------------------------------------------
 	
 	-- Test Plan Process --------------------------------
-	
+	stim_proc : process
+      begin
+        reset <= '1';
+        wait for 20 ns;
+        reset <= '0';
+        wait for 20 ns;
+    
+        left <= '1';
+        wait for 100 ns;
+        left <= '0';
+        wait for 50 ns;
+    
+        right <= '1';
+        wait for 100 ns;
+        right <= '0';
+        wait for 50 ns;
+    
+        left <= '1';
+        right <= '1';
+        wait for 100 ns;
+        left <= '0';
+        right <= '0';
+    
+        wait;
+      end process;
 	-----------------------------------------------------	
 	
 end test_bench;
