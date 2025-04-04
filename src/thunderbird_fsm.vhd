@@ -36,18 +36,18 @@
 --|					can be changed by the inputs
 --|					
 --|
---|                 xxx State Encoding key
+--|                 binary  Encoding key
 --|                 --------------------
 --|                  State | Encoding
 --|                 --------------------
---|                  OFF   | 
---|                  ON    | 
---|                  R1    | 
---|                  R2    | 
---|                  R3    | 
---|                  L1    | 
---|                  L2    | 
---|                  L3    | 
+--|                  OFF   | 000
+--|                  ON    | 001
+--|                  R1    | 010
+--|                  R2    | 011
+--|                  R3    | 100
+--|                  L1    | 101
+--|                  L2    | 110
+--|                  L3    | 111
 --|                 --------------------
 --|
 --|
@@ -82,75 +82,85 @@
 --|
 --+----------------------------------------------------------------------------
 library ieee;
+ 
   use ieee.std_logic_1164.all;
   use ieee.numeric_std.all;
+entity thunderbird_fsm is
  
- -----------------------
---| One-Hot State Encoding key
---| --------------------
---| State | Encoding
---| --------------------
---| OFF   | 10000000
---| ON    | 01000000
---| R1    | 00100000
---| R2    | 00010000
---| R3    | 00001000
---| L1    | 00000100
---| L2    | 00000010
---| L3    | 00000001
---| --------------------
  
-entity thunderbird_fsm is 
-  port(
+    port (
         i_clk, i_reset  : in    std_logic;
         i_left, i_right : in    std_logic;
         o_lights_L      : out   std_logic_vector(2 downto 0);
         o_lights_R      : out   std_logic_vector(2 downto 0)
-  );
+    );
 end thunderbird_fsm;
-
-architecture thunderbird_fsm_arch of thunderbird_fsm is 
-
+architecture thunderbird_fsm_arch of thunderbird_fsm is
 -- CONSTANTS ------------------------------------------------------------------
-    signal w_state: std_logic_vector(7 downto 0) := "10000000";
-	signal w_next : std_logic_vector(7 downto 0) := "10000000";
-  
+    signal f_Q : std_logic_vector(2 downto 0) := "000";
+    signal f_Q_next : std_logic_vector(2 downto 0) := "000";
 begin
-
 	-- CONCURRENT STATEMENTS --------------------------------------------------------	
-	w_next(0) <= w_state(1);
-	w_next(1) <= w_state(2);
-	w_next(2) <= w_state(7) and i_left;
-	w_next(3) <= w_state(4);
-	w_next(4) <= w_state(5);
-	w_next(5) <= w_state(7) and i_right;
-	w_next(6) <= w_state(7) and i_left and i_right;
-	w_next(7) <= w_state(7) or w_state(6) or w_state(3) or w_state(0);
-	
-	with w_state select
-    o_lights_L <= "000" when "10000000", -- OFF
-                "111" when "01000000", -- ON (hazard)
-                "000" when "00100000", -- R1
-                "000" when "00010000", -- R2
-                "000" when "00001000", -- R3
-                "001" when "00000100", -- L1
-                "011" when "00000010", -- L2
-                "111" when "00000001", -- L3
-                "000" when others;
-
     ---------------------------------------------------------------------------------
-	-- PROCESSES --------------------------------------------------------------------
-    process(i_clk)
-    begin
-      if rising_edge(i_clk) then
-        if i_reset = '1' then
-          w_state <= "10000000"; -- OFF
-        else
-          w_state <= w_next;
-        end if;
-      end if;
-    end process;
+	--next state 
+	f_Q_next(0) <= (f_Q(2) and f_Q(1) and not f_Q(0))
+	               or (not f_Q(2) and f_Q(1) and not f_Q(0))
+	               or (not f_Q(2) and not f_Q(1) and not f_Q(0) and i_left and i_right)
+	               or (not f_Q(2) and not f_Q(1) and not f_Q(0) and i_left and not i_right);
 
-	-----------------------------------------------------					   
-				  
+	f_Q_next(1) <= (f_Q(2) and f_Q(1) and not f_Q(0))
+	               or (f_Q(2) and not f_Q(1) and f_Q(0))
+	               or (not f_Q(2) and f_Q(1) and not f_Q(0))
+	               or (not f_Q(2) and not f_Q(1) and not f_Q(0) and not i_left and i_right);
+
+	f_Q_next(2) <= (f_Q(2) and f_Q(1) and not f_Q(0))
+	               or (f_Q(2) and not f_Q(1) and f_Q(0))
+	               or (not f_Q(2) and f_Q(1) and f_Q(0))
+	               or (not f_Q(2) and not f_Q(1) and not f_Q(0) and i_left and not i_right); --change s2
+ 
+ 
+	--outputs
+
+	o_lights_L(2) <= (not f_Q(2) and not f_Q(1) and f_Q(0))
+	                 or (f_Q(2) and f_Q(1) and f_Q(0));  
+
+	o_lights_L(1) <= (not f_Q(2) and not f_Q(1) and f_Q(0))	
+	                 or (f_Q(2) and f_Q(1));   
+
+	o_lights_L(0) <= (not f_Q(2) and not f_Q(1) and f_Q(0))	                 
+	                 or (f_Q(2) and f_Q(1))
+	                 or (f_Q(2) and f_Q(0));  
+
+	o_lights_R(2) <= (f_Q(2) and not f_Q(1) and not f_Q(0))
+                     or (not f_Q(2) and not f_Q(1) and f_Q(0));   
+
+    o_lights_R(1) <= (f_Q(2) and not f_Q(1) and not f_Q(0)) 
+                      or (not f_Q(2) and f_Q(0));   
+
+    o_lights_R(0) <= (f_Q(2) and not f_Q(1) and not f_Q(0))
+                      or (not f_Q(2) and  f_Q(1))                 
+                      or (not f_Q(2) and  f_Q(0)) ;  
+ 
+	-- PROCESSES --------------------------------------------------------------------
+	-----------------------------------------------------clock
+	register_proc: process(i_clk, i_reset)
+
+        begin
+
+        if rising_edge(i_clk) then
+
+            if i_reset = '1' then
+
+                f_Q <= "000"; 
+            else
+                f_Q <= f_Q_next;  -- next state
+
+            end if;
+
+        end if;
+
+        end process register_proc;
+ 
 end thunderbird_fsm_arch;
+ 
+    
